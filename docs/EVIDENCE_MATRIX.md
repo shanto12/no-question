@@ -14,9 +14,13 @@ Updated: 2026-08-09 (America/Chicago)
 | Local production build | Terminal | PASS | `npm run verify` passed; Vite production build generated `dist/` |
 | Static security headers configured | Terminal + `netlify.toml` | PASS | CSP, HSTS, referrer, frame, content-type, and permissions policies present |
 | npm dependency audit | Terminal | PASS | `npm audit --omit=dev` and high-severity audit reported 0 vulnerabilities |
-| Production deployment | Pending | PENDING | Capture Netlify site, deploy, and production URL after publish |
-| Production route behavior | Pending | PENDING | Verify `/` and SPA fallback on live Netlify URL |
-| Production headers | Pending | PENDING | Capture live response headers from Netlify URL |
-| Real Chrome manual pass | Pending | PENDING | Verify using the user's existing Chrome profile |
-| Production desktop + mobile pass | Pending | PENDING | Repeat live checks in Playwright and real Chrome |
-| Failed production requests / console errors | Pending | PENDING | Capture live Playwright console and request evidence |
+| Repeatable CI quality gate | GitHub Actions workflow | CONFIGURED | `.github/workflows/quality.yml` runs `npm ci`, production build verification, and high-severity production audit on `main` and pull requests |
+| Production deployment | Netlify CLI + live URL | PASS | Site `no-question`, site ID `71a33e8e-7638-4291-b479-83f40a6b4ec8`, deploy ID `6a78e118db3b90d295abdbfa`, production URL `https://no-question.netlify.app` |
+| Production route behavior | curl + production Playwright | PASS | `/` returned HTTP 200; `/puzzle` returned the same app through SPA fallback |
+| Production headers | curl response headers | PASS | Live CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy, and Referrer-Policy present |
+| Real Chrome manual pass | User's connected Chrome profile | PASS | Help, all three solve workflows, navigation anchors, mode overview, hero play, and hint exercised; no app-origin logs |
+| Production desktop + mobile pass | Production Playwright | PASS | Desktop production snapshot plus mobile 390x844; `scrollWidth` 375 with no horizontal overflow |
+| Failed production requests / console errors | Production Playwright requests + console | PASS | Four observed production requests all returned 200; console errors and warnings: 0 |
+| Auth / logout / login | Scope review | N/A | Deliberately backend-free MVP; no accounts, auth, or logout surface exists |
+| Password-manager behavior | Scope review | N/A | No sign-in or password fields exist in this MVP |
+| API calls / backend jobs / runner jobs | Scope review + production requests | N/A | No API or background runner is required; the only runtime persistence is browser local storage |

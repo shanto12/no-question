@@ -2,6 +2,9 @@
 
 No Question is a visual brain-puzzle game built around a small reversal: the evidence is visible, but the question is not. Players infer the hidden prompt, enter an answer, and get a short explanation of the connection they found.
 
+Live production site: https://no-question.netlify.app
+Source repository: https://github.com/shanto12/no-question
+
 ## MVP modes
 
 - **Hidden signal** — infer the invisible constant shared by three clues.
