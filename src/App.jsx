@@ -37,6 +37,20 @@ function solveDateKey(offsetDays = 0) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(date)
 }
 
+function getDraft(progress, puzzleForMode) {
+  const draft = progress.drafts?.[puzzleForMode.id] ?? {}
+  const validLabels = new Set(puzzleForMode.clues.map((clue) => clue.label))
+  const sequence = Array.isArray(draft.sequence)
+    ? [...new Set(draft.sequence.filter((label) => validLabels.has(label)))]
+    : []
+  return {
+    question: typeof draft.question === 'string' ? draft.question : '',
+    answer: typeof draft.answer === 'string' ? draft.answer : '',
+    selectedEvidence: validLabels.has(draft.selectedEvidence) ? draft.selectedEvidence : null,
+    sequence,
+  }
+}
+
 function App() {
   const [storedProgress] = useState(loadProgress)
   const [activeMode, setActiveMode] = useState(storedProgress.lastMode)
@@ -74,14 +88,15 @@ function App() {
 
   useEffect(() => {
     function onStorage(event) {
-      if (event.key === progressKey && event.newValue) {
-        setProgress(parseProgress(event.newValue))
-        setSaveState('synced from another tab')
-      }
+      if (event.key !== progressKey && event.key !== null) return
+      const nextProgress = parseProgress(event.newValue)
+      setProgress(nextProgress)
+      hydrateDraft(nextProgress, activeMode)
+      setSaveState('synced from another tab')
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  }, [activeMode])
 
   useEffect(() => {
     function setConnection() {
@@ -126,20 +141,16 @@ function App() {
       }
       if (event.metaKey || event.ctrlKey || event.altKey || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
       if (event.key === '?') openHelp()
-      if (event.key === '1') chooseMode('hidden')
-      if (event.key === '2') chooseMode('odd')
-      if (event.key === '3') chooseMode('sequence')
+      if (event.key === '1') switchModeShortcut('hidden')
+      if (event.key === '2') switchModeShortcut('odd')
+      if (event.key === '3') switchModeShortcut('sequence')
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isHelpOpen])
 
   useEffect(() => {
-    const draft = progress.drafts?.[puzzle.id] ?? {}
-    setQuestion(typeof draft.question === 'string' ? draft.question : '')
-    setAnswer(typeof draft.answer === 'string' ? draft.answer : '')
-    setSelectedEvidence(typeof draft.selectedEvidence === 'string' ? draft.selectedEvidence : null)
-    setSequence(Array.isArray(draft.sequence) ? draft.sequence : [])
+    hydrateDraft(progress, activeMode)
     setHintVisible(false)
     setShowDescriptions(false)
     setFeedback(null)
@@ -151,9 +162,19 @@ function App() {
     setIsHelpOpen(true)
   }
 
-  function closeHelp() {
+  function closeHelp({ restoreFocus = true } = {}) {
     setIsHelpOpen(false)
-    window.requestAnimationFrame(() => lastFocusedRef.current?.focus?.())
+    if (restoreFocus) window.requestAnimationFrame(() => lastFocusedRef.current?.focus?.())
+  }
+
+  function hydrateDraft(nextProgress, modeId) {
+    const nextPuzzle = puzzles.find((item) => item.mode === modeId)
+    if (!nextPuzzle) return
+    const draft = getDraft(nextProgress, nextPuzzle)
+    setQuestion(draft.question)
+    setAnswer(draft.answer)
+    setSelectedEvidence(draft.selectedEvidence)
+    setSequence(draft.sequence)
   }
 
   function writeDraft(changes) {
@@ -173,6 +194,35 @@ function App() {
     setActiveMode(modeId)
     setProgress((current) => ({ ...current, lastMode: modeId }))
     document.getElementById('puzzle')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function focusModeTab(modeId) {
+    window.requestAnimationFrame(() => document.getElementById(`mode-tab-${modeId}`)?.focus())
+  }
+
+  function switchModeShortcut(modeId) {
+    chooseMode(modeId)
+    focusModeTab(modeId)
+  }
+
+  function handleModeKeyDown(event, modeId) {
+    const index = modes.findIndex((item) => item.id === modeId)
+    let nextIndex = index
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % modes.length
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + modes.length) % modes.length
+    if (event.key === 'Home') nextIndex = 0
+    if (event.key === 'End') nextIndex = modes.length - 1
+    if (nextIndex === index) return
+    event.preventDefault()
+    switchModeShortcut(modes[nextIndex].id)
+  }
+
+  function startPlaying() {
+    closeHelp({ restoreFocus: false })
+    window.requestAnimationFrame(() => {
+      document.getElementById('puzzle')?.scrollIntoView({ behavior: 'auto', block: 'start' })
+      document.getElementById('puzzle-title')?.focus({ preventScroll: true })
+    })
   }
 
   function resetPuzzle() {
@@ -312,7 +362,7 @@ function App() {
           <div className="section-heading">
             <div>
               <p className="eyebrow"><span className="eyebrow-line" /> your daily set</p>
-              <h2 id="puzzle-title">Start with what you can see.</h2>
+              <h2 id="puzzle-title" tabIndex="-1">Start with what you can see.</h2>
             </div>
             <div className="completion-meter" aria-label={`${progress.completed.length} of ${puzzles.length} puzzles solved`}>
               <span>set progress</span>
@@ -323,7 +373,7 @@ function App() {
 
           <div className="mode-tabs" role="tablist" aria-label="Puzzle modes" id="modes">
             {modes.map((item) => (
-                <button className={`mode-tab ${activeMode === item.id ? 'active' : ''}`} id={`mode-tab-${item.id}`} type="button" role="tab" aria-selected={activeMode === item.id} aria-controls="puzzle-panel" data-testid={`mode-tab-${item.id}`} key={item.id} onClick={() => chooseMode(item.id)}>
+                <button className={`mode-tab ${activeMode === item.id ? 'active' : ''}`} id={`mode-tab-${item.id}`} type="button" role="tab" tabIndex={activeMode === item.id ? 0 : -1} aria-selected={activeMode === item.id} aria-controls="puzzle-panel" data-testid={`mode-tab-${item.id}`} key={item.id} onKeyDown={(event) => handleModeKeyDown(event, item.id)} onClick={() => chooseMode(item.id)}>
                 <span className={`mode-icon ${item.accent}`} aria-hidden="true">{item.icon}</span>
                 <span><small>{item.eyebrow}</small><strong>{item.name}</strong></span>
                 <span className="mode-arrow" aria-hidden="true">↗</span>
@@ -342,16 +392,18 @@ function App() {
               <p className="board-description">{puzzle.description}</p>
               <button className="description-toggle" type="button" aria-pressed={showDescriptions} onClick={() => setShowDescriptions((current) => !current)} data-testid="description-toggle">{showDescriptions ? 'Hide clue descriptions' : 'Describe the clues'} <span aria-hidden="true">{showDescriptions ? '−' : '+'}</span></button>
               <div className={`clue-grid mode-${activeMode}`} aria-label={`Visual clues for ${mode.name}`}>
-                {puzzle.clues.map((clue, index) => (
-                  <button type="button" className={`clue-tile tone-${clue.tone} ${selectedEvidence === clue.label ? 'selected' : ''} ${sequence.includes(clue.label) ? 'in-sequence' : ''} ${showDescriptions ? 'has-description' : ''}`} key={clue.label} disabled={activeMode === 'hidden'} aria-label={`${clue.label}, ${clue.meta}${clue.odd ? ', possible odd one out' : ''}`} aria-pressed={activeMode === 'odd' ? selectedEvidence === clue.label : sequence.includes(clue.label)} onClick={() => activeMode === 'odd' ? selectEvidence(clue.label) : activeMode === 'sequence' ? selectSequence(clue) : null}>
+                {puzzle.clues.map((clue, index) => {
+                  const clueDescriptionId = `clue-description-${puzzle.id}-${index}`
+                  const isSelected = activeMode === 'odd' ? selectedEvidence === clue.label : activeMode === 'sequence' ? sequence.includes(clue.label) : undefined
+                  return <button type="button" className={`clue-tile tone-${clue.tone} ${selectedEvidence === clue.label ? 'selected' : ''} ${sequence.includes(clue.label) ? 'in-sequence' : ''} ${showDescriptions ? 'has-description' : ''}`} key={clue.label} disabled={activeMode === 'hidden'} aria-label={`${clue.label}, ${clue.meta}${clue.odd ? ', possible odd one out' : ''}`} aria-describedby={showDescriptions ? clueDescriptionId : undefined} aria-pressed={isSelected} onClick={() => activeMode === 'odd' ? selectEvidence(clue.label) : activeMode === 'sequence' ? selectSequence(clue) : null}>
                     <span className="clue-number">0{index + 1}</span>
                     <span className="clue-glyph" aria-hidden="true">{clue.glyph}</span>
                     <span className="clue-label">{clue.label}</span>
                     <span className="clue-meta">{clue.meta}</span>
-                    {showDescriptions && <span className="clue-description">{clue.description}</span>}
+                    {showDescriptions && <span id={clueDescriptionId} className="clue-description">{clue.description}</span>}
                     {activeMode === 'sequence' && sequence.includes(clue.label) && <span className="sequence-badge">{sequence.indexOf(clue.label) + 1}</span>}
                   </button>
-                ))}
+                })}
               </div>
               {hintVisible && <div className="hint-strip"><span aria-hidden="true">⌁</span><span><strong>One extra signal:</strong> {activeMode === 'hidden' ? 'it has been measured for longer than anyone can remember.' : activeMode === 'odd' ? 'Four tiles belong to the same creative family.' : 'The story begins below the surface.'}</span></div>}
             </div>
@@ -404,7 +456,7 @@ function App() {
 
       <footer className="site-footer"><a className="brand" href="#top"><span className="brand-mark" aria-hidden="true"><span /><span /><span /><span /></span><span>no question</span></a><span>made for the gloriously curious</span><span>© 2026 / issue 001</span></footer>
 
-      {isHelpOpen && <div className="modal-backdrop" role="presentation" onClick={closeHelp}><section className="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title" aria-describedby="help-description" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" aria-label="Close how to play" ref={helpCloseRef} onClick={closeHelp}>×</button><p className="eyebrow"><span className="eyebrow-line" /> the only rule</p><h2 id="help-title">The question is yours.</h2><p id="help-description">Every puzzle gives you evidence but withholds the prompt. Write the question you think is hiding there, then make the answer fit. You can ask for one clue if you need a nudge.</p><div className="help-steps"><span><b>01</b> notice</span><span><b>02</b> frame</span><span><b>03</b> solve</span></div><p className="help-shortcuts"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch modes · <kbd>?</kbd> rules · <kbd>Esc</kbd> close</p><button className="button button-primary" type="button" onClick={() => { closeHelp(); document.getElementById('puzzle')?.scrollIntoView({ behavior: 'smooth' }) }}>Got it — let’s play <span aria-hidden="true">↗</span></button></section></div>}
+      {isHelpOpen && <div className="modal-backdrop" role="presentation" onClick={closeHelp}><section className="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title" aria-describedby="help-description" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" aria-label="Close how to play" ref={helpCloseRef} onClick={closeHelp}>×</button><p className="eyebrow"><span className="eyebrow-line" /> the only rule</p><h2 id="help-title">The question is yours.</h2><p id="help-description">Every puzzle gives you evidence but withholds the prompt. Write the question you think is hiding there, then make the answer fit. You can ask for one clue if you need a nudge.</p><div className="help-steps"><span><b>01</b> notice</span><span><b>02</b> frame</span><span><b>03</b> solve</span></div><p className="help-shortcuts"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch modes · <kbd>?</kbd> rules · <kbd>Esc</kbd> close</p><button className="button button-primary" type="button" onClick={startPlaying}>Got it — let’s play <span aria-hidden="true">↗</span></button></section></div>}
     </div>
   )
 }
