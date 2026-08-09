@@ -209,6 +209,26 @@ h1 em, h2 em { color: var(--amber); font-family: Georgia, serif; font-weight: 40
 .help-steps { display: flex; gap: 24px; margin: 28px 0; color: var(--faint); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
 .help-steps b { margin-right: 6px; color: var(--amber); font-weight: 400; }
 
+.skip-link { position: fixed; z-index: 30; top: 10px; left: 10px; padding: 10px 14px; border: 1px solid var(--amber); background: var(--paper-soft); color: var(--ink); font-family: var(--mono); font-size: 10px; transform: translateY(-200%); transition: transform 160ms ease; }
+.skip-link:focus { transform: translateY(0); }
+.puzzle-stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; color: var(--faint); font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; }
+.solved-tag { color: var(--mint); }
+.description-toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 15px; padding: 0; border: 0; background: transparent; color: var(--amber); font-family: var(--mono); font-size: 10px; letter-spacing: 0.03em; text-transform: uppercase; }
+.description-toggle:hover { color: var(--ink); }
+.clue-tile:disabled { cursor: default; opacity: 1; }
+.clue-description { position: relative; z-index: 1; max-width: 190px; margin-top: 8px; color: rgba(245,242,235,0.62); font-size: 10px; line-height: 1.35; }
+.clue-tile.has-description { min-height: 230px; }
+.feedback-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.feedback-button { padding: 9px 11px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; }
+.feedback-button:hover { border-color: var(--amber); color: var(--amber); }
+.hint-cost { color: var(--amber); }
+.save-status { color: var(--faint); }
+.help-shortcuts { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.help-shortcuts kbd { padding: 3px 5px; border: 1px solid var(--line); color: var(--ink); font-family: var(--mono); font-size: 9px; }
+.error-screen { min-height: 100dvh; max-width: 520px; margin: 0 auto; padding: 14vh 24px; }
+.error-screen h1 { margin: 20px 0; font-size: clamp(48px, 8vw, 78px); }
+.error-screen p:not(.eyebrow) { margin-bottom: 28px; color: var(--muted); line-height: 1.6; }
+
 @media (max-width: 960px) {
   .app-shell { padding: 0 4vw; }
   .main-nav { gap: 17px; margin-right: 14px; }

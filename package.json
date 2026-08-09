@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/build.mjs",
     "preview": "vite preview",
-    "verify": "npm run build && node scripts/verify-static.mjs"
+    "verify": "npm run build && node scripts/test-game.mjs && node scripts/verify-static.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",

@@ -1,0 +1,15 @@
+{
+  "name": "No Question",
+  "short_name": "No Question",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#11110f",
+  "theme_color": "#11110f",
+  "description": "A visual brain game where you infer the missing question, then solve it.",
+  "icons": [{
+    "src": "/favicon.svg",
+    "sizes": "any",
+    "type": "image/svg+xml",
+    "purpose": "any maskable"
+  }]
+}
