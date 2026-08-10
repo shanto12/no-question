@@ -159,6 +159,7 @@ function App() {
     setFeedback(null)
     setFormError('')
     setShareState('Share solve')
+    window.requestAnimationFrame(() => document.getElementById(`mode-tab-${activeMode}`)?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' }))
   }, [activeMode])
 
   function openHelp() {
