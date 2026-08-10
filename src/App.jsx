@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { modes, puzzles } from './game-data.js'
 import { evaluatePuzzle, getDailyModeId, getNextModeId } from './game-logic.js'
-import { parseProgress, progressKey, readStoredProgress, serializeProgress } from './progress.js'
+import { isProgressEnvelope, parseProgress, progressKey, readStoredProgress, serializeProgress } from './progress.js'
 
 function solveDateKey(offsetDays = 0) {
   const date = new Date(Date.now() + offsetDays * 86400000)
@@ -368,13 +368,13 @@ function App() {
     try {
       const raw = await file.text()
       const parsed = JSON.parse(raw)
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid progress envelope')
+      if (!isProgressEnvelope(parsed)) throw new Error('Invalid progress envelope')
       const imported = parseProgress(raw)
       setProgress(imported)
       setActiveMode(imported.lastMode)
       hydrateDraft(imported, imported.lastMode)
       setSaveState('imported on this device')
-      setFeedback({ type: 'success', title: 'Progress restored.', body: 'Your local solve history and in-progress drafts are back on this device.' })
+      window.setTimeout(() => setFeedback({ type: 'success', title: 'Progress restored.', body: 'Your local solve history and in-progress drafts are back on this device.' }), 0)
     } catch {
       setFeedback({ type: 'try', title: 'That file could not be read.', body: 'Choose a No Question progress export and try again.' })
     }

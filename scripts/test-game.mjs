@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { modes, puzzles } from '../src/game-data.js'
 import { evaluatePuzzle, expectedSequence, getDailyModeId, getNextModeId, includesKeyword, validatePuzzleCatalog } from '../src/game-logic.js'
-import { parseProgress, progressVersion, serializeProgress } from '../src/progress.js'
+import { isProgressEnvelope, parseProgress, progressVersion, serializeProgress } from '../src/progress.js'
 
 const hidden = puzzles.find((puzzle) => puzzle.mode === 'hidden')
 const odd = puzzles.find((puzzle) => puzzle.mode === 'odd')
@@ -25,6 +25,9 @@ assert.equal(migrated.score, 12)
 assert.equal(migrated.drafts['odd-band'].question.length, 1000)
 assert.equal(parseProgress('{bad json').version, progressVersion)
 assert.equal(JSON.parse(serializeProgress(migrated)).version, progressVersion)
+assert.equal(isProgressEnvelope(migrated), true)
+assert.equal(isProgressEnvelope({ commit: 'abc', builtAt: 'today' }), false)
+assert.equal(isProgressEnvelope({ version: progressVersion + 1, completed: [] }), false)
 const bounded = parseProgress(JSON.stringify({ attempts: { 'hidden-time': -3, 'odd-band': 10001, 'not-a-puzzle': 8, 'sequence-garden': {} }, hints: [] }))
 assert.deepEqual(bounded.attempts, { 'hidden-time': 0, 'odd-band': 9999 })
 assert.deepEqual(bounded.hints, {})

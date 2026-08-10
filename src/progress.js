@@ -62,6 +62,12 @@ export function serializeProgress(progress) {
   }, null, 2)
 }
 
+export function isProgressEnvelope(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  if (Number.isFinite(value.version) && value.version > progressVersion) return false
+  return ['lastMode', 'completed', 'score', 'streak', 'attempts', 'hints', 'drafts'].some((key) => key in value)
+}
+
 export function readStoredProgress() {
   try {
     return parseProgress(window.localStorage.getItem(progressKey))
