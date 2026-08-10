@@ -3,7 +3,8 @@
 Updated: 2026-08-09 (America/Chicago)
 
 Application source verified: `7b56b65c0e9633ac7d385d0c47e38fd6e2f1faca`
-Documentation-inclusive packaging commit: `7b56b65c0e9633ac7d385d0c47e38fd6e2f1faca`
+Production packaging commit: `7b56b65c0e9633ac7d385d0c47e38fd6e2f1faca`
+Evidence matrix first committed in GitHub: `b5c95e2f4582803feb5d245bc95abee1f88b6c55`
 Production URL: https://no-question.netlify.app
 Netlify deploy: `6a79506712930a64d2e8666c`
 Unique deploy URL: https://6a79506712930a64d2e8666c--no-question.netlify.app
