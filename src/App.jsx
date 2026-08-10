@@ -159,7 +159,7 @@ function App() {
     setFeedback(null)
     setFormError('')
     setShareState('Share solve')
-    window.requestAnimationFrame(() => document.getElementById(`mode-tab-${activeMode}`)?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' }))
+    revealModeTab(activeMode)
   }, [activeMode])
 
   function openHelp() {
@@ -199,15 +199,24 @@ function App() {
     setActiveMode(modeId)
     setProgress((current) => ({ ...current, lastMode: modeId }))
     if (updateUrl && typeof window !== 'undefined') window.history.replaceState(null, '', `#puzzle/${modeId}`)
-    window.requestAnimationFrame(() => document.getElementById(`mode-tab-${modeId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }))
+    revealModeTab(modeId, 'smooth')
     document.getElementById('puzzle')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function revealModeTab(modeId, behavior = 'auto') {
+    window.requestAnimationFrame(() => {
+      const tab = document.getElementById(`mode-tab-${modeId}`)
+      const rail = tab?.parentElement
+      if (!tab || !rail) return
+      rail.scrollTo({ left: Math.max(0, tab.offsetLeft - (rail.clientWidth - tab.offsetWidth) / 2), behavior })
+    })
   }
 
   function focusModeTab(modeId) {
     window.requestAnimationFrame(() => {
       const tab = document.getElementById(`mode-tab-${modeId}`)
       tab?.focus()
-      tab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+      revealModeTab(modeId, 'smooth')
     })
   }
 
