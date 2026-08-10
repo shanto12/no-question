@@ -89,6 +89,7 @@ export const puzzles = [
 ]
 
 export const initialProgress = {
+  version: 2,
   lastMode: 'hidden',
   completed: [],
   score: 0,

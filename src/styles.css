@@ -39,7 +39,7 @@ a { color: inherit; text-decoration: none; }
 .header-actions { display: flex; align-items: center; gap: 14px; }
 .streak-pill { color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: 0.03em; white-space: nowrap; }
 .streak-pill span { color: var(--amber); margin-right: 5px; }
-.icon-button, .modal-close { border: 1px solid var(--line); background: transparent; color: var(--ink); width: 31px; height: 31px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; transition: background 180ms ease, border-color 180ms ease; }
+.icon-button, .modal-close { border: 1px solid var(--line); background: transparent; color: var(--ink); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; transition: background 180ms ease, border-color 180ms ease; }
 .icon-button:hover, .modal-close:hover { background: var(--paper-soft); border-color: rgba(243, 240, 233, 0.5); }
 
 .hero-section { display: grid; grid-template-columns: minmax(0, 0.93fr) minmax(390px, 1.07fr); align-items: center; min-height: 600px; padding: 75px 0 78px; border-bottom: 1px solid var(--line); }
@@ -92,6 +92,10 @@ h1 em, h2 em { color: var(--amber); font-family: Georgia, serif; font-weight: 40
 .completion-meter small { color: var(--faint); font-size: 13px; }
 .meter-track { height: 2px; background: var(--line); }
 .meter-track span { display: block; height: 100%; background: var(--amber); transition: width 450ms ease; }
+.meter-fill { width: 0; }
+.meter-1 { width: 33.333%; }
+.meter-2 { width: 66.666%; }
+.meter-3 { width: 100%; }
 .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 48px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .mode-tab { display: flex; align-items: center; gap: 13px; min-height: 87px; padding: 16px 18px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); text-align: left; transition: background 180ms ease, color 180ms ease; }
 .mode-tab:last-child { border-right: 0; }
@@ -138,8 +142,8 @@ h1 em, h2 em { color: var(--amber); font-family: Georgia, serif; font-weight: 40
 .clue-glyph { position: absolute; top: 35px; left: 50%; color: rgba(255,255,255,0.85); font-family: Georgia, serif; font-size: 78px; transform: translateX(-50%); }
 .mode-odd .clue-glyph { font-size: 55px; top: 51px; }
 .mode-sequence .clue-glyph { top: 33px; }
-.clue-label { position: relative; z-index: 1; font-size: 14px; font-weight: 600; letter-spacing: -0.03em; }
-.clue-meta { bottom: 16px; right: 16px; color: rgba(255,255,255,0.56); }
+.clue-label { position: relative; z-index: 1; max-width: 100%; padding-right: 28px; font-size: 14px; font-weight: 600; letter-spacing: -0.03em; }
+.clue-meta { position: relative; z-index: 1; right: auto; bottom: auto; margin-top: 5px; color: rgba(255,255,255,0.56); }
 .sequence-badge { position: absolute; right: 14px; top: 12px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--mint); color: var(--paper); font-family: var(--mono); font-size: 10px; font-weight: 700; }
 .hint-strip { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 13px 14px; border: 1px solid rgba(242,177,95,0.27); background: rgba(242,177,95,0.07); color: var(--muted); font-size: 11px; line-height: 1.4; }
 .hint-strip > span:first-child { color: var(--amber); font-size: 17px; line-height: 1; }
@@ -201,7 +205,7 @@ h1 em, h2 em { color: var(--amber); font-family: Georgia, serif; font-weight: 40
 .mode-card:hover .card-arrow { color: var(--amber); }
 .site-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 0 30px; border-top: 1px solid var(--line); color: var(--faint); font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; }
 .site-footer .brand { color: var(--ink); font-family: var(--sans); font-size: 12px; text-transform: lowercase; letter-spacing: -0.04em; }
-.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(5,5,4,0.8); backdrop-filter: blur(7px); }
+.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; overflow: auto; padding: 24px; background: rgba(5,5,4,0.8); backdrop-filter: blur(7px); }
 .help-modal { position: relative; width: min(100%, 500px); padding: 38px; border: 1px solid var(--line); background: var(--paper-soft); box-shadow: 0 28px 100px rgba(0,0,0,0.45); }
 .modal-close { position: absolute; top: 17px; right: 17px; }
 .help-modal h2 { max-width: 330px; margin: 0 0 18px; font-size: 47px; font-weight: 500; line-height: 0.95; }
@@ -225,6 +229,17 @@ h1 em, h2 em { color: var(--amber); font-family: Georgia, serif; font-weight: 40
 .save-status { color: var(--faint); }
 .help-shortcuts { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
 .help-shortcuts kbd { padding: 3px 5px; border: 1px solid var(--line); color: var(--ink); font-family: var(--mono); font-size: 9px; }
+.progress-tools { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.game-footer .progress-tools button { color: var(--muted); }
+.game-footer .progress-tools button:hover { color: var(--amber); }
+.sequence-helper { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.sequence-helper p { margin: 0; }
+.sequence-actions { display: inline-flex; gap: 8px; flex: 0 0 auto; }
+.text-button { padding: 0; border: 0; background: transparent; color: var(--amber); font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; }
+.text-button:disabled { color: var(--faint); cursor: default; }
+.field-error { margin: 11px 0 0; color: var(--coral); font-family: var(--mono); font-size: 10px; line-height: 1.45; }
+textarea[aria-invalid="true"], input[aria-invalid="true"] { border-color: var(--coral); box-shadow: 0 0 0 1px rgba(236,116,109,0.2); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .error-screen { min-height: 100dvh; max-width: 520px; margin: 0 auto; padding: 14vh 24px; }
 .error-screen h1 { margin: 20px 0; font-size: clamp(48px, 8vw, 78px); }
 .error-screen p:not(.eyebrow) { margin-bottom: 28px; color: var(--muted); line-height: 1.6; }

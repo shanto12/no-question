@@ -23,3 +23,11 @@ class AppErrorBoundary extends React.Component {
 }
 
 createRoot(document.getElementById('root')).render(<StrictMode><AppErrorBoundary><App /></AppErrorBoundary></StrictMode>)
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((error) => {
+      console.warn('No Question offline shell unavailable', error)
+    })
+  }, { once: true })
+}

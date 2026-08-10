@@ -1,40 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { initialProgress, modes, puzzles } from './game-data.js'
-import { evaluatePuzzle, getNextModeId } from './game-logic.js'
-
-const progressKey = 'no-question-progress'
-
-function parseProgress(raw) {
-  try {
-    const parsed = raw ? JSON.parse(raw) : {}
-    return {
-      ...initialProgress,
-      ...parsed,
-      lastMode: modes.some((item) => item.id === parsed.lastMode) ? parsed.lastMode : initialProgress.lastMode,
-      completed: Array.isArray(parsed.completed) ? [...new Set(parsed.completed.filter((id) => puzzles.some((puzzle) => puzzle.id === id)))] : [],
-      score: Number.isFinite(parsed.score) ? Math.max(0, parsed.score) : 0,
-      streak: Number.isFinite(parsed.streak) ? Math.max(0, parsed.streak) : initialProgress.streak,
-      lastSolvedDate: typeof parsed.lastSolvedDate === 'string' ? parsed.lastSolvedDate : initialProgress.lastSolvedDate,
-      attempts: parsed.attempts && typeof parsed.attempts === 'object' ? parsed.attempts : {},
-      hints: parsed.hints && typeof parsed.hints === 'object' ? parsed.hints : {},
-      drafts: parsed.drafts && typeof parsed.drafts === 'object' ? parsed.drafts : {},
-    }
-  } catch {
-    return initialProgress
-  }
-}
-
-function loadProgress() {
-  try {
-    return parseProgress(window.localStorage.getItem(progressKey))
-  } catch {
-    return initialProgress
-  }
-}
+import { modes, puzzles } from './game-data.js'
+import { evaluatePuzzle, getDailyModeId, getNextModeId } from './game-logic.js'
+import { parseProgress, progressKey, readStoredProgress, serializeProgress } from './progress.js'
 
 function solveDateKey(offsetDays = 0) {
   const date = new Date(Date.now() + offsetDays * 86400000)
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(date)
+}
+
+function modeFromLocation() {
+  if (typeof window === 'undefined') return null
+  const match = window.location.hash.match(/^#puzzle\/(hidden|odd|sequence)$/)
+  return match?.[1] ?? null
 }
 
 function getDraft(progress, puzzleForMode) {
@@ -52,8 +29,9 @@ function getDraft(progress, puzzleForMode) {
 }
 
 function App() {
-  const [storedProgress] = useState(loadProgress)
-  const [activeMode, setActiveMode] = useState(storedProgress.lastMode)
+  const [storedProgress] = useState(readStoredProgress)
+  const dailyModeId = useMemo(() => getDailyModeId(solveDateKey(), modes), [])
+  const [activeMode, setActiveMode] = useState(() => modeFromLocation() ?? storedProgress.lastMode ?? dailyModeId)
   const [progress, setProgress] = useState(storedProgress)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
@@ -62,10 +40,12 @@ function App() {
   const [hintVisible, setHintVisible] = useState(false)
   const [showDescriptions, setShowDescriptions] = useState(false)
   const [feedback, setFeedback] = useState(null)
+  const [formError, setFormError] = useState('')
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [saveState, setSaveState] = useState('saving')
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine)
   const [shareState, setShareState] = useState('Share solve')
+  const importInputRef = useRef(null)
   const helpCloseRef = useRef(null)
   const lastFocusedRef = useRef(null)
 
@@ -77,9 +57,12 @@ function App() {
   const nextModeId = getNextModeId(activeMode, modes)
   const isSetComplete = progress.completed.length === puzzles.length
 
+  const dailyMode = modes.find((item) => item.id === dailyModeId) ?? mode
+  const formErrorId = activeMode === 'odd' ? 'evidence-error' : activeMode === 'sequence' ? 'sequence-error' : !question.trim() ? 'question-error' : 'answer-error'
+
   useEffect(() => {
     try {
-      window.localStorage.setItem(progressKey, JSON.stringify(progress))
+      window.localStorage.setItem(progressKey, serializeProgress(progress))
       setSaveState('saved on this device')
     } catch {
       setSaveState('device save unavailable')
@@ -91,11 +74,31 @@ function App() {
       if (event.key !== progressKey && event.key !== null) return
       const nextProgress = parseProgress(event.newValue)
       setProgress(nextProgress)
-      hydrateDraft(nextProgress, activeMode)
+      if (nextProgress.lastMode !== activeMode) {
+        setActiveMode(nextProgress.lastMode)
+        window.history.replaceState(null, '', `#puzzle/${nextProgress.lastMode}`)
+      }
+      hydrateDraft(nextProgress, nextProgress.lastMode)
       setSaveState('synced from another tab')
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
+  }, [activeMode])
+
+  useEffect(() => {
+    function onLocationChange() {
+      const nextMode = modeFromLocation()
+      if (nextMode && nextMode !== activeMode) setActiveMode(nextMode)
+    }
+    window.addEventListener('hashchange', onLocationChange)
+    window.addEventListener('popstate', onLocationChange)
+    if (modeFromLocation()) {
+      window.requestAnimationFrame(() => document.getElementById('puzzle')?.scrollIntoView({ behavior: 'auto', block: 'start' }))
+    }
+    return () => {
+      window.removeEventListener('hashchange', onLocationChange)
+      window.removeEventListener('popstate', onLocationChange)
+    }
   }, [activeMode])
 
   useEffect(() => {
@@ -139,7 +142,7 @@ function App() {
         }
         return
       }
-      if (event.metaKey || event.ctrlKey || event.altKey || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
+      if (event.metaKey || event.ctrlKey || event.altKey || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLButtonElement || event.target instanceof HTMLAnchorElement || event.target.isContentEditable) return
       if (event.key === '?') openHelp()
       if (event.key === '1') switchModeShortcut('hidden')
       if (event.key === '2') switchModeShortcut('odd')
@@ -154,6 +157,7 @@ function App() {
     setHintVisible(false)
     setShowDescriptions(false)
     setFeedback(null)
+    setFormError('')
     setShareState('Share solve')
   }, [activeMode])
 
@@ -190,14 +194,20 @@ function App() {
     }))
   }
 
-  function chooseMode(modeId) {
+  function chooseMode(modeId, { updateUrl = true } = {}) {
     setActiveMode(modeId)
     setProgress((current) => ({ ...current, lastMode: modeId }))
+    if (updateUrl && typeof window !== 'undefined') window.history.replaceState(null, '', `#puzzle/${modeId}`)
+    window.requestAnimationFrame(() => document.getElementById(`mode-tab-${modeId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }))
     document.getElementById('puzzle')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   function focusModeTab(modeId) {
-    window.requestAnimationFrame(() => document.getElementById(`mode-tab-${modeId}`)?.focus())
+    window.requestAnimationFrame(() => {
+      const tab = document.getElementById(`mode-tab-${modeId}`)
+      tab?.focus()
+      tab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    })
   }
 
   function switchModeShortcut(modeId) {
@@ -233,12 +243,14 @@ function App() {
     setHintVisible(false)
     setShowDescriptions(false)
     setFeedback(null)
+    setFormError('')
     setShareState('Share solve')
     writeDraft({ question: '', answer: '', selectedEvidence: null, sequence: [] })
   }
 
   function selectSequence(clue) {
     setFeedback(null)
+    setFormError('')
     const nextSequence = sequence.includes(clue.label)
       ? sequence.filter((label) => label !== clue.label)
       : [...sequence, clue.label]
@@ -246,14 +258,40 @@ function App() {
     writeDraft({ sequence: nextSequence })
   }
 
+  function undoSequence() {
+    if (!sequence.length) return
+    const nextSequence = sequence.slice(0, -1)
+    setSequence(nextSequence)
+    setFeedback(null)
+    writeDraft({ sequence: nextSequence })
+  }
+
+  function clearSequence() {
+    if (!sequence.length) return
+    setSequence([])
+    setFeedback(null)
+    writeDraft({ sequence: [] })
+  }
+
   function selectEvidence(label) {
     setSelectedEvidence(label)
     writeDraft({ selectedEvidence: label })
     setFeedback(null)
+    setFormError('')
   }
 
   function submitPuzzle(event) {
     event.preventDefault()
+    const missingQuestion = !question.trim()
+    const missingAnswer = activeMode !== 'odd' && !answer.trim()
+    const missingEvidence = activeMode === 'odd' && !selectedEvidence
+    const incompleteSequence = activeMode === 'sequence' && sequence.length !== puzzle.clues.length
+    if (missingQuestion || missingAnswer || missingEvidence || incompleteSequence) {
+      setFormError(missingQuestion ? 'Write the question you think the clues are asking.' : missingAnswer ? 'Name the answer before checking your thinking.' : missingEvidence ? 'Choose the tile that breaks the rule.' : 'Tap every clue once, in the order the story wants to happen.')
+      setFeedback(null)
+      return
+    }
+    setFormError('')
     const evaluation = evaluatePuzzle(puzzle, activeMode, { question, answer, selectedEvidence, sequence, hintVisible })
     const attemptNumber = attempts + 1
     const alreadyDone = progress.completed.includes(puzzle.id)
@@ -296,10 +334,11 @@ function App() {
   }
 
   async function shareResult() {
-    const text = `No Question / ${puzzle.id}\n${puzzle.intendedQuestion}\nScore: ${feedback?.score ?? 0} · Attempt ${feedback?.attemptNumber ?? attempts}\n\nSolve yours: https://no-question.netlify.app/#puzzle`
+    const shareUrl = `https://no-question.netlify.app/#puzzle/${activeMode}`
+    const text = `No Question / ${puzzle.id}\n${puzzle.intendedQuestion}\nScore: ${feedback?.score ?? 0} · Attempt ${feedback?.attemptNumber ?? attempts}\n\nSolve yours: ${shareUrl}`
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'No Question solve', text, url: 'https://no-question.netlify.app/#puzzle' })
+        await navigator.share({ title: 'No Question solve', text, url: shareUrl })
         setShareState('Shared')
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(text)
@@ -309,6 +348,35 @@ function App() {
       }
     } catch (error) {
       if (error?.name !== 'AbortError') setShareState('Try again')
+    }
+  }
+
+  function exportProgress() {
+    const blob = new Blob([serializeProgress(progress)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `no-question-progress-${solveDateKey()}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function importProgress(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const raw = await file.text()
+      const parsed = JSON.parse(raw)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid progress envelope')
+      const imported = parseProgress(raw)
+      setProgress(imported)
+      setActiveMode(imported.lastMode)
+      hydrateDraft(imported, imported.lastMode)
+      setSaveState('imported on this device')
+      setFeedback({ type: 'success', title: 'Progress restored.', body: 'Your local solve history and in-progress drafts are back on this device.' })
+    } catch {
+      setFeedback({ type: 'try', title: 'That file could not be read.', body: 'Choose a No Question progress export and try again.' })
     }
   }
 
@@ -334,11 +402,11 @@ function App() {
       <main id="top">
         <section className="hero-section" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <p className="eyebrow"><span className="eyebrow-line" /> visual brain games / issue 001</p>
+            <p className="eyebrow"><span className="eyebrow-line" /> daily spotlight / {dailyMode.name}</p>
             <h1 id="hero-title">The question<br /><em>is missing.</em></h1>
             <p className="hero-subtitle">Read the clues. Feel the pattern. Figure out what you’re being asked — then solve it.</p>
             <div className="hero-actions">
-              <button className="button button-primary" type="button" onClick={() => chooseMode('hidden')}>Play today’s puzzle <span aria-hidden="true">↗</span></button>
+              <button className="button button-primary" type="button" onClick={() => chooseMode(dailyMode.id)}>Play today’s puzzle <span aria-hidden="true">↗</span></button>
               <a className="text-link" href="#modes">See how it works <span aria-hidden="true">↓</span></a>
             </div>
             <div className="hero-proof">
@@ -367,7 +435,7 @@ function App() {
             <div className="completion-meter" aria-label={`${progress.completed.length} of ${puzzles.length} puzzles solved`}>
               <span>set progress</span>
               <strong>{String(progress.completed.length).padStart(2, '0')} <small>/ {String(puzzles.length).padStart(2, '0')}</small></strong>
-              <div className="meter-track"><span style={{ width: `${(progress.completed.length / puzzles.length) * 100}%` }} /></div>
+            <div className="meter-track"><span className={`meter-fill meter-${progress.completed.length}`} /></div>
             </div>
           </div>
 
@@ -408,39 +476,41 @@ function App() {
               {hintVisible && <div className="hint-strip"><span aria-hidden="true">⌁</span><span><strong>One extra signal:</strong> {activeMode === 'hidden' ? 'it has been measured for longer than anyone can remember.' : activeMode === 'odd' ? 'Four tiles belong to the same creative family.' : 'The story begins below the surface.'}</span></div>}
             </div>
 
-            <form className="solve-panel" onSubmit={submitPuzzle} aria-describedby="solve-intro">
+            <form className="solve-panel" onSubmit={submitPuzzle} noValidate aria-labelledby="solve-title" aria-describedby="solve-intro">
               <div className="solve-kicker"><span className={`mode-icon ${mode.accent}`} aria-hidden="true">{mode.icon}</span><span>{mode.name}</span></div>
-              <h3>What’s the question?</h3>
+              <h3 id="solve-title">What’s the question?</h3>
               <p className="solve-intro" id="solve-intro">It’s your move. Write the question you think these clues are asking, then give us your answer.</p>
 
               <label htmlFor="question-input">01 / infer the prompt</label>
-              <textarea id="question-input" value={question} onChange={(event) => { setQuestion(event.target.value); writeDraft({ question: event.target.value }); if (feedback?.type !== 'success') setFeedback(null) }} placeholder={puzzle.questionPlaceholder} rows="3" required />
+              <textarea id="question-input" value={question} aria-invalid={Boolean(formError && !question.trim())} aria-describedby={formError && !question.trim() ? 'question-error' : undefined} onChange={(event) => { setQuestion(event.target.value); setFormError(''); writeDraft({ question: event.target.value }); if (feedback?.type !== 'success') setFeedback(null) }} placeholder={puzzle.questionPlaceholder} rows="3" required />
 
               {activeMode === 'odd' ? (
-                <fieldset>
+                  <fieldset aria-invalid={Boolean(formError && !selectedEvidence)} aria-describedby={formError ? formErrorId : undefined}>
                   <legend>02 / choose the answer</legend>
                   <div className="choice-grid">
-                    {puzzle.clues.map((clue) => <button className={`choice-button ${selectedEvidence === clue.label ? 'selected' : ''}`} type="button" key={clue.label} onClick={() => selectEvidence(clue.label)}>{clue.label}<span aria-hidden="true">{selectedEvidence === clue.label ? '✓' : '↗'}</span></button>)}
+                    {puzzle.clues.map((clue) => <button className={`choice-button ${selectedEvidence === clue.label ? 'selected' : ''}`} aria-pressed={selectedEvidence === clue.label} type="button" key={clue.label} onClick={() => selectEvidence(clue.label)}>{clue.label}<span aria-hidden="true">{selectedEvidence === clue.label ? '✓' : '↗'}</span></button>)}
                   </div>
                 </fieldset>
               ) : (
                 <>
                   <label htmlFor="answer-input">02 / name the answer</label>
-                  <input id="answer-input" value={answer} onChange={(event) => { setAnswer(event.target.value); writeDraft({ answer: event.target.value }); if (feedback?.type !== 'success') setFeedback(null) }} placeholder={puzzle.answerPlaceholder} required />
+                  <input id="answer-input" value={answer} aria-invalid={Boolean(formError && !answer.trim())} aria-describedby={formError && !answer.trim() ? 'answer-error' : undefined} onChange={(event) => { setAnswer(event.target.value); setFormError(''); writeDraft({ answer: event.target.value }); if (feedback?.type !== 'success') setFeedback(null) }} placeholder={puzzle.answerPlaceholder} required />
                 </>
               )}
 
-              {activeMode === 'sequence' && <p className="sequence-helper"><span aria-hidden="true">↗</span> Tap tiles in order. Your sequence: <strong>{sequence.length ? sequence.join(' → ') : 'not started'}</strong></p>}
+              {activeMode === 'sequence' && <div className="sequence-helper" id="sequence-status" aria-live="polite" aria-atomic="true"><p><span aria-hidden="true">↗</span> Tap tiles in order. Your sequence: <strong>{sequence.length ? sequence.join(' → ') : 'not started'}</strong></p><div className="sequence-actions"><button type="button" className="text-button" onClick={undoSequence} disabled={!sequence.length} data-testid="undo-sequence">Undo</button><button type="button" className="text-button" onClick={clearSequence} disabled={!sequence.length} data-testid="clear-sequence">Clear</button></div></div>}
+
+              {formError && <p className="field-error" id={formErrorId} role="alert">{formError}</p>}
 
               <div className="solve-actions">
                 <button className="button button-primary solve-button" type="submit" data-testid="submit-puzzle">Check my thinking <span aria-hidden="true">↗</span></button>
                 <button className="button button-quiet" type="button" onClick={revealHint} data-testid="hint-button">Reveal a clue <span className="hint-cost">−15</span></button>
               </div>
-              {feedback && <div className={`feedback feedback-${feedback.type}`} role="status" data-testid="feedback"><span className="feedback-icon" aria-hidden="true">{feedback.type === 'success' ? '✓' : feedback.type === 'hint' ? '⌁' : '!'}</span><div><strong>{feedback.title}</strong><p>{feedback.body}</p>{feedback.type === 'success' && <div className="feedback-actions"><button className="feedback-button" type="button" onClick={shareResult} data-testid="share-solve">{shareState} <span aria-hidden="true">↗</span></button><button className="feedback-button" type="button" onClick={() => chooseMode(nextModeId)} data-testid="next-puzzle">{isSetComplete ? 'Replay this set' : 'Next puzzle'} <span aria-hidden="true">→</span></button></div>}</div></div>}
+              {feedback && <div className={`feedback feedback-${feedback.type}`} role="status" aria-live="polite" data-testid="feedback"><span className="feedback-icon" aria-hidden="true">{feedback.type === 'success' ? '✓' : feedback.type === 'hint' ? '⌁' : '!'}</span><div><strong>{feedback.title}</strong><p>{feedback.body}</p>{feedback.type === 'success' && <div className="feedback-actions"><button className="feedback-button" type="button" onClick={shareResult} data-testid="share-solve">{shareState} <span aria-hidden="true">↗</span></button><button className="feedback-button" type="button" onClick={() => chooseMode(nextModeId)} data-testid="next-puzzle">{isSetComplete ? 'Replay this set' : 'Next puzzle'} <span aria-hidden="true">→</span></button></div>}</div></div>}
             </form>
           </div>
 
-          <div className="game-footer"><span><span className="tiny-dot" /> no timer / no leaderboard pressure</span><span className="save-status" role="status"><span className="tiny-dot" /> {isOnline ? saveState : 'offline · saved locally'}</span><button type="button" onClick={resetPuzzle}>Reset this puzzle <span aria-hidden="true">↺</span></button><span>score: <strong>{String(progress.score).padStart(3, '0')}</strong></span></div>
+          <div className="game-footer"><span><span className="tiny-dot" /> no timer / no leaderboard pressure</span><span className="save-status" role="status"><span className="tiny-dot" /> {isOnline ? saveState : 'offline · saved locally'}</span><div className="progress-tools"><button type="button" onClick={exportProgress} data-testid="export-progress">Export progress</button><button type="button" onClick={() => importInputRef.current?.click()} data-testid="import-progress">Import progress</button><input ref={importInputRef} className="visually-hidden" type="file" accept="application/json,.json" onChange={importProgress} aria-label="Choose a No Question progress export" /></div><button type="button" onClick={resetPuzzle}>Reset this puzzle <span aria-hidden="true">↺</span></button><span>score: <strong>{String(progress.score).padStart(3, '0')}</strong></span></div>
         </section>
 
         <section className="about-section" id="about" aria-labelledby="about-title">

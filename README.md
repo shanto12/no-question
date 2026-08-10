@@ -28,3 +28,14 @@ npm audit --omit=dev
 ```
 
 The Netlify deployment uses the `dist` directory, SPA fallback routing, and security headers defined in `netlify.toml` and `public/_headers`.
+
+## Next release hardening
+
+The current release also includes versioned local progress with JSON backup/restore, mode deep links, deterministic Central Time daily spotlighting, an offline app shell, content validation/digest provenance, sequence undo/clear controls, accessible form errors, and a production smoke checker:
+
+```bash
+npm run verify
+EXPECTED_COMMIT=$(git rev-parse HEAD) npm run verify:production
+```
+
+`verify:production` accepts `PRODUCTION_URL` and `EXPECTED_COMMIT` environment variables when checking another deployment.

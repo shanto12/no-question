@@ -3,6 +3,11 @@
   publish = "dist"
 
 [[redirects]]
+  from = "/assets/*"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
@@ -16,3 +21,27 @@
     X-Frame-Options = "DENY"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Resource-Policy = "same-origin"
+    X-DNS-Prefetch-Control = "off"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public,max-age=31536000,immutable"
+
+[[headers]]
+  for = "/build.json"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Content-Type = "application/javascript; charset=UTF-8"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
